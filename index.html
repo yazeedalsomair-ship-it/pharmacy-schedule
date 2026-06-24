@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schedule Editor — SGH Pharmacy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+
+:root{
+  --navy:#0B2C4D;--navy2:#143b63;--green:#1A8754;--blue:#2563A8;
+  --bg:#EEF2F6;--card:#fff;--ink:#0F2236;--muted:#5B6B7C;--line:#DDE5EC;
+  --out-bg:#FFF3D6;--out-ink:#8A5A00;--out-bar:#E8A317;
+  --in-bg:#DEEBFB;--in-ink:#1B4F86;--in-bar:#2F77C7;
+  --nt-bg:#E4E2F4;--nt-ink:#3A327A;--nt-bar:#5247A8;
+  --iv-bg:#E2F4E8;--iv-ink:#176A3D;--iv-bar:#28A75C;
+  --cl-bg:#DDF3F1;--cl-ink:#0E6A60;--cl-bar:#1AA396;
+  --na-bg:#FBE4DC;--na-ink:#9C3B16;--na-bar:#D9622E;
+  --off-bg:#EEF1F4;--off-ink:#8A97A4;
+  --err:#C42B2B;--err-bg:#FCE8E8;--warn:#B5651D;--warn-bg:#FBF0E2;--ok:#1A8754;--ok-bg:#E7F4EC;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1320px;margin:0 auto;padding:0 14px 60px}
+header{background:linear-gradient(120deg,var(--navy),var(--navy2));color:#fff;border-radius:0 0 20px 20px}
+.hd{max-width:1320px;margin:0 auto;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.crest{width:44px;height:44px;border-radius:11px;background:#fff;display:grid;place-items:center}
+.crest span{font-weight:800;color:var(--navy);font-size:18px}
+.brand h1{font-size:17px;font-weight:800}
+.brand p{font-size:12px;color:#bcd2e8;font-weight:500}
+.hd .meta{font-size:12px;color:#cfe0f1;text-align:right}
+.hd .meta b{display:block;font-size:14px;color:#fff}
+
+.modebar{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-top:16px;padding:10px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.seg{display:inline-flex;background:#EDF1F5;border-radius:11px;padding:4px}
+.seg button{border:0;background:transparent;font-family:inherit;font-weight:700;font-size:14px;color:var(--muted);padding:8px 18px;border-radius:8px;cursor:pointer}
+.seg button.on{background:#fff;color:var(--navy);box-shadow:0 1px 4px rgba(11,44,77,.12)}
+.spacer{flex:1}
+.savedtag{font-size:12px;color:var(--muted);font-weight:600}
+.savedtag b{color:var(--green)}
+
+.toolbar{background:var(--card);border:1px solid var(--line);border-radius:14px;margin-top:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.btn{font-family:inherit;font-weight:700;font-size:13px;border:1.5px solid var(--line);background:#fff;color:var(--navy);border-radius:9px;padding:8px 13px;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{border-color:var(--green);color:var(--green)}
+.btn.solid{background:var(--green);color:#fff;border-color:var(--green)}
+.btn.solid:hover{background:#15703f;color:#fff}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-top:14px;box-shadow:0 6px 20px rgba(16,34,54,.05)}
+.panel h3{font-size:15px;font-weight:800;color:var(--navy);margin-bottom:3px}
+.panel .hint{font-size:12px;color:var(--muted);margin-bottom:12px}
+.weeklabel{font-size:12.5px;font-weight:800;color:var(--navy);background:#EEF3F8;border-radius:8px;padding:5px 10px;display:inline-block;margin-bottom:10px}
+
+.gridwrap{overflow-x:auto}
+table.sched{border-collapse:separate;border-spacing:0;width:100%;font-size:11.5px;min-width:4200px}
+table.sched th,table.sched td{padding:4px 3px;text-align:center}
+table.sched thead th{font-weight:700;color:var(--muted);font-size:11px;border-bottom:2px solid var(--line);white-space:nowrap}
+table.sched thead th .wd{display:block;font-size:10px;color:#9aa7b4;font-weight:600}
+table.sched thead th.fri{color:var(--warn)}
+table.sched thead th.todayh{color:var(--green)}
+td.nm{text-align:left;font-weight:700;white-space:nowrap;padding-left:8px;position:sticky;left:0;background:var(--card);border-right:1px solid var(--line);min-width:84px;z-index:2}
+tr:nth-child(even) td.nm{background:#FAFBFC}
+.cellbox{display:flex;flex-direction:column;gap:2px}
+select.cell{font-family:inherit;font-size:10px;font-weight:700;border:1px solid transparent;border-radius:6px;padding:5px 2px;width:100%;min-width:92px;cursor:pointer;text-align:center}
+select.cell:focus{outline:2px solid var(--green)}
+input.note{font-family:inherit;font-size:9px;border:1px solid var(--line);border-radius:5px;padding:2px 3px;width:100%;text-align:center;color:var(--muted)}
+input.note::placeholder{color:#C5CCD3}
+.bg-OUT{background:var(--out-bg);color:var(--out-ink)}
+.bg-IN{background:var(--in-bg);color:var(--in-ink)}
+.bg-NIGHT{background:var(--nt-bg);color:var(--nt-ink)}
+.bg-IV{background:var(--iv-bg);color:var(--iv-ink)}
+.bg-CLINICAL{background:var(--cl-bg);color:var(--cl-ink)}
+.bg-NARCOTIC{background:var(--na-bg);color:var(--na-ink)}
+.bg-OFF{background:var(--off-bg);color:var(--off-ink)}
+td.todaycol{background:rgba(26,135,84,.06);border-radius:8px}
+
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:12px;color:var(--muted);font-weight:600}
+.legend i{width:13px;height:13px;border-radius:4px;display:inline-block;vertical-align:-2px;margin-right:4px}
+
+table.cov{border-collapse:separate;border-spacing:0;width:100%;font-size:11.5px;min-width:2800px}
+table.cov th,table.cov td{padding:6px 4px;text-align:center;border-bottom:1px solid var(--line)}
+table.cov thead th{color:var(--muted);font-weight:700;font-size:10.5px}
+table.cov thead th.fri{color:var(--warn)}
+table.cov td.lab{text-align:left;font-weight:700;white-space:nowrap;padding-left:8px}
+.note-callout{background:#FBF0E2;border:1px solid #F0DDB0;color:#7a5b10;border-radius:12px;padding:10px 14px;margin-top:14px;font-size:12.5px;font-weight:600}
+
+.pill{font-size:12.5px;font-weight:800;border-radius:20px;padding:5px 11px;display:inline-block;margin-left:6px;vertical-align:middle}
+.pill.err{background:var(--err-bg);color:var(--err)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.conflist{display:flex;flex-direction:column;gap:8px}
+.citem{border-radius:11px;padding:10px 12px;border:1px solid var(--line);background:#fff}
+.citem.err{border-left:4px solid var(--err);background:var(--err-bg)}
+.citem.warn{border-left:4px solid var(--warn);background:var(--warn-bg)}
+.citem.info{border-left:4px solid var(--muted);background:#F4F6F8}
+.citem .ct{font-size:12.5px;font-weight:800;margin-bottom:2px}
+.citem.err .ct{color:var(--err)}
+.citem.warn .ct{color:var(--warn)}
+.citem.info .ct{color:var(--muted)}
+.citem .cd{font-size:12px;color:#46586a}
+.allclear{text-align:center;padding:20px 10px;color:var(--ok)}
+.allclear .big{font-size:28px}
+.allclear .t{font-weight:800;margin-top:6px;font-size:13px}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(11,44,77,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal-box{background:#fff;border-radius:16px;padding:22px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal-box h3{font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.modal-box .hint{font-size:12.5px;color:var(--muted);margin-bottom:10px}
+.modal-preview{background:#F4F7FA;border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-weight:600;max-height:120px;overflow:auto}
+
+/* Employee view */
+.empwrap{max-width:760px;margin:16px auto 0}
+.pickrow{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;gap:12px;align-items:end;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:11.5px;font-weight:700;color:var(--muted)}
+select.big{font-family:inherit;font-size:15px;font-weight:700;color:var(--ink);background:#fff;border:1.5px solid var(--line);border-radius:10px;padding:10px 14px;min-width:220px;cursor:pointer}
+select.big:focus{outline:2px solid var(--green);border-color:var(--green)}
+
+.todaycard{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-top:16px;box-shadow:0 8px 26px rgba(16,34,54,.06)}
+.tbanner{padding:24px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.tbanner.OUT{background:linear-gradient(120deg,#E8A317,#caa10f)}
+.tbanner.IN{background:linear-gradient(120deg,#2F77C7,#225fa3)}
+.tbanner.NIGHT{background:linear-gradient(120deg,#5247A8,#3c3486)}
+.tbanner.IV{background:linear-gradient(120deg,#28A75C,#1f8a49)}
+.tbanner.CLINICAL{background:linear-gradient(120deg,#1AA396,#147f76)}
+.tbanner.NARCOTIC{background:linear-gradient(120deg,#D9622E,#b84e22)}
+.tbanner.OFF{background:linear-gradient(120deg,#7c8a99,#5f6e7c)}
+.tbanner .who p{font-size:12px;opacity:.85;font-weight:600;letter-spacing:.3px;text-transform:uppercase}
+.tbanner .who h2{font-size:25px;font-weight:800;margin-top:3px}
+.tbanner .who .sub{font-size:13.5px;font-weight:600;opacity:.92;margin-top:4px}
+.shiftpill{background:rgba(255,255,255,.18);border:1.5px solid rgba(255,255,255,.4);border-radius:14px;padding:13px 20px;text-align:center}
+.shiftpill .lab{font-size:11px;font-weight:600;opacity:.9}
+.shiftpill .big{font-size:18px;font-weight:800;margin-top:2px}
+.shiftpill .tm{font-size:12px;font-weight:600;opacity:.92;margin-top:2px}
+.nodata{padding:24px;text-align:center;color:var(--muted)}
+
+.weekblock{margin-top:16px}
+.weekhead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.weekhead h4{font-size:13.5px;font-weight:800;color:var(--navy)}
+.tagnow{background:var(--ok-bg);color:var(--ok);font-size:10.5px;font-weight:800;border-radius:20px;padding:3px 9px}
+.daychips{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.chip{border-radius:12px;padding:10px 4px;text-align:center;border:1px solid var(--line);background:#fff}
+.chip .d{font-size:11px;font-weight:700;color:var(--muted)}
+.chip .dt{font-size:9.5px;color:#a7b1ba;font-weight:600}
+.chip .s{font-size:10px;font-weight:800;margin-top:5px;line-height:1.25}
+.chip.work{border-width:0}
+.chip.OUT{background:var(--out-bg);color:var(--out-ink)}
+.chip.IN{background:var(--in-bg);color:var(--in-ink)}
+.chip.NIGHT{background:var(--nt-bg);color:var(--nt-ink)}
+.chip.IV{background:var(--iv-bg);color:var(--iv-ink)}
+.chip.CLINICAL{background:var(--cl-bg);color:var(--cl-ink)}
+.chip.NARCOTIC{background:var(--na-bg);color:var(--na-ink)}
+.chip.OFF{background:var(--off-bg);color:var(--off-ink)}
+.chip.today{outline:2.5px solid var(--green);outline-offset:1px}
+
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;font-weight:700;font-size:13.5px;padding:11px 20px;border-radius:11px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;pointer-events:none;transition:.3s;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.hidden{display:none!important}
+footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
+@media print{.modebar,.toolbar,.pickrow{display:none}header{border-radius:0}}
+@media(max-width:560px){.daychips{grid-template-columns:repeat(4,1fr)}}
+
+
+.modal-overlay{position:fixed;inset:0;background:rgba(11,44,77,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal-box{background:#fff;border-radius:16px;padding:22px;max-width:420px;width:100%;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+.modal-box h3{font-size:16px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.modal-box .hint{font-size:12.5px;color:var(--muted);margin-bottom:10px}
+.modal-preview{background:#F4F7FA;border-radius:10px;padding:10px 12px;font-size:12px;color:var(--ink);font-weight:600;max-height:120px;overflow:auto}
+.pingate{position:fixed;inset:0;background:linear-gradient(135deg,var(--navy),var(--navy2));display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.pinbox{background:#fff;border-radius:20px;padding:32px 28px;max-width:360px;width:100%;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.35)}
+.pinbox .crest2{width:54px;height:54px;border-radius:14px;background:var(--navy);display:grid;place-items:center;margin:0 auto 14px}
+.pinbox .crest2 span{color:#fff;font-weight:800;font-size:20px}
+.pinbox h2{font-size:17px;font-weight:800;color:var(--navy);margin-bottom:4px}
+.pinbox p{font-size:12.5px;color:var(--muted);margin-bottom:18px}
+.pinbox input{width:100%;font-family:inherit;font-size:22px;font-weight:800;letter-spacing:8px;text-align:center;border:1.5px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.pinbox input:focus{outline:2px solid var(--green);border-color:var(--green)}
+.pinbox .err{color:var(--err);font-size:12.5px;font-weight:700;min-height:18px;margin-bottom:6px}
+.pill{font-size:12.5px;font-weight:800;border-radius:20px;padding:5px 11px;display:inline-block;margin-left:6px;vertical-align:middle}
+.pill.err{background:var(--err-bg);color:var(--err)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.conflist{display:flex;flex-direction:column;gap:8px}
+.citem{border-radius:11px;padding:10px 12px;border:1px solid var(--line);background:#fff}
+.citem.err{border-left:4px solid var(--err);background:var(--err-bg)}
+.citem.warn{border-left:4px solid var(--warn);background:var(--warn-bg)}
+.citem.info{border-left:4px solid var(--muted);background:#F4F6F8}
+.citem .ct{font-size:12.5px;font-weight:800;margin-bottom:2px}
+.citem.err .ct{color:var(--err)}
+.citem.warn .ct{color:var(--warn)}
+.citem.info .ct{color:var(--muted)}
+.citem .cd{font-size:12px;color:#46586a}
+.allclear{text-align:center;padding:20px 10px;color:var(--ok)}
+.allclear .big{font-size:28px}
+.allclear .t{font-weight:800;margin-top:6px;font-size:13px}
+.synctag{font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px}
+.synctag.live{color:var(--ok)} .synctag.busy{color:var(--warn)} .synctag.err{color:var(--err)}
+.dot{width:8px;height:8px;border-radius:50%;background:currentColor;display:inline-block}
+
+</style>
+</head>
+<body>
+
+<div class="pingate" id="pinGate">
+  <div class="pinbox">
+    <div class="crest2"><span>SGH</span></div>
+    <h2>Editor Access</h2>
+    <p>Enter the editor PIN to make changes to the pharmacy schedule.</p>
+    <input type="password" inputmode="numeric" maxlength="6" id="pinInput" placeholder="••••" onkeydown="if(event.key==='Enter')checkPin()">
+    <div class="err" id="pinErr"></div>
+    <button class="btn solid" style="width:100%;justify-content:center" onclick="checkPin()">Unlock</button>
+  </div>
+</div>
+
+<header><div class="hd">
+  <div class="brand"><div class="crest"><span>SGH</span></div>
+    <div><h1>Schedule Editor</h1><p>Saudi German Hospital — Hail Pharmacy</p></div></div>
+  <div class="meta">Connected to live database<b id="rangeTag">—</b></div>
+</div></header>
+
+<div class="wrap">
+  <div class="toolbar">
+    <button class="btn solid" onclick="saveSched()">💾 Save & publish</button>
+    <span class="synctag" id="syncTag"></span>
+    <div class="spacer"></div>
+    <button class="btn solid" onclick="document.getElementById('xlImporter').click()" style="background:var(--blue);border-color:var(--blue)">📥 Import month (Excel)</button>
+    <input type="file" id="xlImporter" accept=".xlsx,.xls" class="hidden" onchange="importExcelFile(event)">
+    <button class="btn" onclick="exportToExcel()">📤 Export to Excel</button>
+    <button class="btn" onclick="exportJSON()">⤓ Backup (JSON)</button>
+    <button class="btn" onclick="document.getElementById('importer').click()">⤒ Restore (JSON)</button>
+    <input type="file" id="importer" accept="application/json" class="hidden" onchange="importJSON(event)">
+    <button class="btn" onclick="reloadFromServer()">↺ Reload from server</button>
+    <button class="btn" style="border-color:#D9622E;color:#D9622E" onclick="restoreBaseline()">⚠️ Restore known-good baseline</button>
+    <button class="btn" onclick="window.print()">🖨 Print</button>
+  </div>
+
+  <div class="panel">
+    <h3>Full schedule (editable)</h3>
+    <p class="hint">Each cell shows a shift dropdown and an optional note. Edits apply instantly here; click <b>Save & publish</b> to push them live to the whole team's "My Shift" page.</p>
+    <div class="gridwrap"><table class="sched" id="sched"></table></div>
+    <div class="legend">
+      <span><i style="background:var(--out-bar)"></i>Outpatient</span>
+      <span><i style="background:var(--in-bar)"></i>Inpatient</span>
+      <span><i style="background:var(--nt-bar)"></i>Night</span>
+      <span><i style="background:var(--iv-bar)"></i>IV</span>
+      <span><i style="background:var(--cl-bar)"></i>Clinical & Quality</span>
+      <span><i style="background:var(--na-bar)"></i>Narcotic</span>
+      <span><i style="background:var(--off-ink)"></i>Off</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>Daily headcount by department</h3>
+    <p class="hint">Number of staff assigned to each department/shift per day.</p>
+    <div class="gridwrap"><table class="cov" id="cov"></table></div>
+  </div>
+
+  <div class="panel">
+    <h3>Conflicts & flags <span id="confCount" class="pill ok">0</span></h3>
+    <p class="hint">Re-checked instantly on every edit.</p>
+    <div id="conflist" class="conflist"></div>
+  </div>
+
+  <footer>Internal admin tool · Saudi German Hospital Pharmacy, Hail</footer>
+  <footer style="margin-top:4px;font-weight:700;color:var(--navy)">Made by Dr.Yazeed Alsomair</footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<div id="modalOverlay" class="modal-overlay hidden">
+  <div class="modal-box">
+    <h3>Confirm month for this file</h3>
+    <p class="hint">The sheet only has day numbers (1–31), so confirm which month/year they belong to.</p>
+    <div id="modalPreview" class="modal-preview"></div>
+    <div style="display:flex;gap:10px;margin-top:12px">
+      <div class="field"><label>Month</label>
+        <select class="big" id="modalMonth" style="min-width:160px">
+          <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+          <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+          <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+          <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+        </select></div>
+      <div class="field"><label>Year</label>
+        <select class="big" id="modalYear" style="min-width:110px"></select></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:flex-end">
+      <button class="btn" onclick="closeModal()">Cancel</button>
+      <button class="btn solid" onclick="confirmImport()">Import this month</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- PIN GATE ---------- */
+const EDITOR_PIN = "2580"; // <-- change this to whatever PIN you want, then re-share the file
+function checkPin(){
+  const v=document.getElementById("pinInput").value.trim();
+  if(v===EDITOR_PIN){
+    document.getElementById("pinGate").style.display="none";
+    sessionStorage.setItem("sgh_editor_unlocked","1");
+  } else {
+    document.getElementById("pinErr").textContent="Incorrect PIN";
+    document.getElementById("pinInput").value="";
+  }
+}
+if(sessionStorage.getItem("sgh_editor_unlocked")==="1"){
+  document.getElementById("pinGate").style.display="none";
+}
+
+/* ---------- FIREBASE ---------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyBbEccCT3NRneb_UWstMv0GYaXvrvms0OE",
+  authDomain: "pharmcy-sgh.firebaseapp.com",
+  projectId: "pharmcy-sgh",
+  storageBucket: "pharmcy-sgh.firebasestorage.app",
+  messagingSenderId: "22468578998",
+  appId: "1:22468578998:web:6c77d9f128764cd6a56017"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const DOC_REF = db.collection("pharmacySchedule").doc("current");
+
+function setSync(state,msg){
+  const el=document.getElementById("syncTag");
+  el.className="synctag "+state;
+  el.innerHTML=`<span class="dot"></span> ${msg}`;
+}
+
+/* ---------- SEED DATA (used only if Firebase has nothing published yet) ---------- */
+const SEED_DATA = {"days": [{"day": 17, "weekday": "Wednesday", "iso": "2026-06-17"}, {"day": 18, "weekday": "Thursday", "iso": "2026-06-18"}, {"day": 19, "weekday": "Friday", "iso": "2026-06-19"}, {"day": 20, "weekday": "Saturday", "iso": "2026-06-20"}, {"day": 21, "weekday": "Sunday", "iso": "2026-06-21"}, {"day": 22, "weekday": "Monday", "iso": "2026-06-22"}, {"day": 23, "weekday": "Tuesday", "iso": "2026-06-23"}, {"day": 24, "weekday": "Wednesday", "iso": "2026-06-24"}, {"day": 25, "weekday": "Thursday", "iso": "2026-06-25"}, {"day": 26, "weekday": "Friday", "iso": "2026-06-26"}, {"day": 27, "weekday": "Saturday", "iso": "2026-06-27"}, {"day": 28, "weekday": "Sunday", "iso": "2026-06-28"}, {"day": 29, "weekday": "Monday", "iso": "2026-06-29"}, {"day": 30, "weekday": "Tuesday", "iso": "2026-06-30"}, {"day": 1, "weekday": "Wednesday", "iso": "2026-07-01"}, {"day": 2, "weekday": "Thursday", "iso": "2026-07-02"}, {"day": 3, "weekday": "Friday", "iso": "2026-07-03"}, {"day": 4, "weekday": "Saturday", "iso": "2026-07-04"}, {"day": 5, "weekday": "Sunday", "iso": "2026-07-05"}, {"day": 6, "weekday": "Monday", "iso": "2026-07-06"}, {"day": 7, "weekday": "Tuesday", "iso": "2026-07-07"}, {"day": 8, "weekday": "Wednesday", "iso": "2026-07-08"}, {"day": 9, "weekday": "Thursday", "iso": "2026-07-09"}, {"day": 10, "weekday": "Friday", "iso": "2026-07-10"}, {"day": 11, "weekday": "Saturday", "iso": "2026-07-11"}, {"day": 12, "weekday": "Sunday", "iso": "2026-07-12"}, {"day": 13, "weekday": "Monday", "iso": "2026-07-13"}, {"day": 14, "weekday": "Tuesday", "iso": "2026-07-14"}, {"day": 15, "weekday": "Wednesday", "iso": "2026-07-15"}, {"day": 16, "weekday": "Thursday", "iso": "2026-07-16"}, {"day": 17, "weekday": "Friday", "iso": "2026-07-17"}, {"day": 18, "weekday": "Saturday", "iso": "2026-07-18"}, {"day": 19, "weekday": "Sunday", "iso": "2026-07-19"}, {"day": 20, "weekday": "Monday", "iso": "2026-07-20"}, {"day": 21, "weekday": "Tuesday", "iso": "2026-07-21"}, {"day": 22, "weekday": "Wednesday", "iso": "2026-07-22"}, {"day": 23, "weekday": "Thursday", "iso": "2026-07-23"}, {"day": 24, "weekday": "Friday", "iso": "2026-07-24"}, {"day": 25, "weekday": "Saturday", "iso": "2026-07-25"}, {"day": 26, "weekday": "Sunday", "iso": "2026-07-26"}, {"day": 27, "weekday": "Monday", "iso": "2026-07-27"}, {"day": 28, "weekday": "Tuesday", "iso": "2026-07-28"}, {"day": 29, "weekday": "Wednesday", "iso": "2026-07-29"}, {"day": 30, "weekday": "Thursday", "iso": "2026-07-30"}, {"day": 31, "weekday": "Friday", "iso": "2026-07-31"}], "assign": {"MANAL": [{"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}], "ATHEER": [{"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}], "YAZEED": [{"code": "OUT_95", "note": null}, {"code": "OUT_95", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "9am-5pm"}, {"code": "OUT_95", "note": null}, {"code": "OUT_95", "note": null}, {"code": "OUT_95", "note": null}, {"code": "OUT_95", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "9am-5pm"}, {"code": "OUT_95", "note": null}, {"code": "OUT_95", "note": null}, {"code": "OUT_95", "note": null}, {"code": "OUT_DEL", "note": "NARCOTIC"}, {"code": "OUT_DEL", "note": "NARCOTIC"}, {"code": "OFF", "note": null}, {"code": "OUT_DEL", "note": "NARCOTIC"}, {"code": "OUT_DEL", "note": "NARCOTIC"}, {"code": "OUT_DEL", "note": "NARCOTIC"}, {"code": "OUT_DEL", "note": "NARCOTIC"}, {"code": "OUT_DEL", "note": "NARCOTIC"}, {"code": "OUT_DEL", "note": "NARCOTIC"}, {"code": "OFF", "note": null}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "OFF", "note": null}, {"code": "OUT_19", "note": "NARCOTIC"}, {"code": "OUT_19", "note": "NARCOTIC"}, {"code": "OUT_19", "note": "NARCOTIC"}, {"code": "OUT_19", "note": "NARCOTIC"}, {"code": "OUT_19", "note": "NARCOTIC"}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}], "TAHANI": [{"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "IN_84", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_SPLIT", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OFF", "note": null}], "WADHA": [{"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OFF", "note": null}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "OFF", "note": null}], "DALAL": [{"code": "OUT_19", "note": null}, {"code": "IN_84", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "OFF", "note": null}], "AHAD": [{"code": "OFF", "note": null}, {"code": "IV_19", "note": "1pm-9pm"}, {"code": "IN_311", "note": null}, {"code": "IV_19", "note": "1pm-9pm"}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "IV_19", "note": "1pm-9pm"}, {"code": "OFF", "note": null}, {"code": "IV_19", "note": "1pm-9pm"}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "OFF", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "OFF", "note": null}], "SOMIA": [{"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "IN_73", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "IN_73", "note": null}], "RAGHAD": [{"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IV_19", "note": "1pm-9pm"}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "11am - 7pm"}, {"code": "OUT_SPLIT", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "IV_19", "note": "1pm-9pm"}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "11am - 7pm"}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "IV_19", "note": "1pm-9pm"}, {"code": "IN_311", "note": null}, {"code": "IV_95", "note": "11am-7pm"}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IV_95", "note": "11am-7pm"}, {"code": "IV_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "11am-7pm"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "IV_19", "note": "1pm-9pm"}, {"code": "OFF", "note": null}], "NOYER": [{"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OFF", "note": null}], "BAYAN": [{"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_SPLIT", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_311", "note": null}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OFF", "note": null}, {"code": "OUT_SPLIT", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_19", "note": "NARCOTIC"}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "OFF", "note": null}, {"code": "OUT_130930", "note": "NARCOTIC"}, {"code": "IN_311", "note": null}], "GOOT": [{"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "OFF", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_SPLIT", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_84", "note": null}, {"code": "IN_73", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "OFF", "note": null}], "REEM": [{"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}], "RAHAF": [{"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "IN_311", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_SPLIT", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "IN_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_73", "note": null}, {"code": "IN_311", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_311", "note": null}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OFF", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "OFF", "note": null}], "GHARAM": [{"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "NIGHT", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_19", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_311", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OUT_130930", "note": null}, {"code": "OFF", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "OUT_84", "note": null}, {"code": "IN_84", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": null}, {"code": "OUT_DEL", "note": "DELIVERY"}, {"code": "OFF", "note": null}, {"code": "OUT_SPLIT", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": null}, {"code": "OUT_19", "note": "NARCOTIC"}, {"code": "OFF", "note": null}, {"code": "NIGHT", "note": null}], "SHOORQ": [{"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "IV_73", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OFF", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OUT_73", "note": null}, {"code": "OFF", "note": null}], "ASSEM": [{"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "9am-5pm"}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "9am-5pm"}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "9am-5pm"}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "10am-8pm"}, {"code": "IV_95", "note": "9am-5pm"}, {"code": "OFF", "note": null}], "AYA": [{"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "IN_73", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}], "SARA": [{"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "CLINICAL", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}], "HIND": [{"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "OFF", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "OFF", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "OFF", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "OFF", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "NARCOTIC", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}, {"code": "OFF", "note": null}]}};
+
+const CATALOG = {
+ OUT_73:{l:"Outpatient 7am-3pm",dept:"OUT"}, OUT_84:{l:"Outpatient 8am-4pm",dept:"OUT"},
+ OUT_SPLIT:{l:"Outpatient 9am-1pm / 5:30-9:30pm",dept:"OUT"}, OUT_95:{l:"Outpatient 9am-5pm",dept:"OUT"},
+ OUT_19:{l:"Outpatient 1pm-9pm",dept:"OUT"}, OUT_130930:{l:"Outpatient 1:30pm-9:30pm",dept:"OUT"},
+ OUT_DEL:{l:"Outpatient 2pm-10pm (Delivery)",dept:"OUT"}, OUT_311:{l:"Outpatient 3pm-11pm",dept:"OUT"},
+ IN_73:{l:"Inpatient 7am-3pm",dept:"IN"}, IN_84:{l:"Inpatient 8am-4pm",dept:"IN"}, IN_311:{l:"Inpatient 3pm-11pm",dept:"IN"},
+ NIGHT:{l:"Night 11pm-7am",dept:"NIGHT"},
+ IV_73:{l:"IV 7am-3pm",dept:"IV"}, IV_95:{l:"IV 9am-5pm",dept:"IV"}, IV_19:{l:"IV 1pm-9pm",dept:"IV"},
+ CLINICAL:{l:"Clinical & Quality 8am-4pm",dept:"CLINICAL"}, NARCOTIC:{l:"Narcotic 8am-4pm",dept:"NARCOTIC"},
+ OFF:{l:"Off",dept:"OFF"}
+};
+const OPTGROUPS=[
+ ["Outpatient",["OUT_73","OUT_84","OUT_SPLIT","OUT_95","OUT_19","OUT_130930","OUT_DEL","OUT_311"]],
+ ["Inpatient",["IN_73","IN_84","IN_311"]],
+ ["IV",["IV_73","IV_95","IV_19"]],
+ ["Support / Night",["NIGHT","CLINICAL","NARCOTIC"]],
+ ["—",["OFF"]]
+];
+const DEPTS=[["OUT","Outpatient"],["IN","Inpatient"],["NIGHT","Night"],["IV","IV"],["CLINICAL","Clinical & Quality"],["NARCOTIC","Narcotic"]];
+
+let DAYS=[], EMP={}, NAMES=[], N=0;
+
+function fmtDate(iso){const d=new Date(iso+"T00:00:00");return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short"});}
+function todayISO(){return new Date().toISOString().slice(0,10);}
+function dayIndexForToday(){return DAYS.findIndex(d=>d.iso===todayISO());}
+
+function loadInto(d){
+  DAYS=d.days; EMP=d.assign; NAMES.length=0; NAMES.push(...Object.keys(EMP)); N=DAYS.length;
+  document.getElementById("rangeTag").textContent = N? (fmtDate(DAYS[0].iso)+" – "+fmtDate(DAYS[N-1].iso)) : "—";
+  render();
+}
+
+function reloadFromServer(){
+  setSync("busy","Reloading…");
+  DOC_REF.get().then(snap=>{
+    if(snap.exists){ loadInto(snap.data()); setSync("live","Synced"); toast("Reloaded from server"); }
+    else { loadInto(SEED_DATA); setSync("warn","No published data yet — showing seed"); }
+  }).catch(err=>{ setSync("err","Offline"); toast("Couldn't reach the server"); console.error(err); });
+}
+function restoreBaseline(){
+  if(!confirm("This discards any edits made in the browser AND overwrites the published Firebase schedule with the original known-good baseline (17 Jun – 31 Jul, before today's date bug). Continue?")) return;
+  loadInto(JSON.parse(JSON.stringify(SEED_DATA)));
+  toast("Baseline loaded locally — click Save & publish to push it live");
+}
+
+/* initial load */
+setSync("busy","Loading…");
+DOC_REF.get().then(snap=>{
+  if(snap.exists){ loadInto(snap.data()); setSync("live","Synced"); }
+  else { loadInto(SEED_DATA); setSync("warn","No published data yet — click Save to publish"); }
+}).catch(err=>{ loadInto(SEED_DATA); setSync("err","Offline — showing last known schedule"); console.error(err); });
+
+function perClass(p){return p==="am"?"sel-am":p==="pm"?"sel-pm":p==="nt"?"sel-nt":"sel-off";}
+function buildOptions(sel,val){
+  OPTGROUPS.forEach(([gl,codes])=>{const og=document.createElement("optgroup");og.label=gl;
+    codes.forEach(c=>{const o=document.createElement("option");o.value=c;o.textContent=CATALOG[c].l;
+      if(c===val)o.selected=true;og.appendChild(o);});sel.appendChild(og);});
+}
+
+function renderGrid(){
+  const t=document.getElementById("sched");
+  const todayIdx=dayIndexForToday();
+  let head="<thead><tr><th class='nm' style='text-align:left'>Employee</th>";
+  DAYS.forEach((d,i)=>{
+    const isFri=d.weekday==="Friday";
+    head+=`<th class="${isFri?'fri':''} ${i===todayIdx?'todayh':''}">${d.day}<span class="wd">${d.weekday.slice(0,3)}</span></th>`;
+  });
+  head+="</tr></thead>";
+  t.innerHTML=head;
+  const tb=document.createElement("tbody");
+  NAMES.forEach(name=>{
+    const tr=document.createElement("tr");
+    const tdn=document.createElement("td");tdn.className="nm";tdn.textContent=name;tr.appendChild(tdn);
+    EMP[name].forEach((cell,di)=>{
+      const td=document.createElement("td");
+      if(di===todayIdx)td.classList.add("todaycol");
+      const box=document.createElement("div");box.className="cellbox";
+      const sel=document.createElement("select");
+      sel.className="cell bg-"+CATALOG[cell.code].dept;
+      buildOptions(sel,cell.code);
+      sel.onchange=()=>{cell.code=sel.value;render();};
+      box.appendChild(sel);
+      const inp=document.createElement("input");inp.type="text";inp.className="note";inp.placeholder="note";
+      inp.value=cell.note||"";
+      inp.onchange=()=>{cell.note=inp.value.trim()||null;};
+      box.appendChild(inp);
+      td.appendChild(box);tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb);
+}
+
+function deptCounts(di){
+  const c={};DEPTS.forEach(([k])=>c[k]=0);
+  NAMES.forEach(n=>{const code=EMP[n][di].code;const dept=CATALOG[code].dept;if(dept in c)c[dept]++;});
+  return c;
+}
+function renderCoverage(){
+  const t=document.getElementById("cov");
+  let head="<thead><tr><th style='text-align:left'>Department</th>";
+  DAYS.forEach(d=>head+=`<th class="${d.weekday==='Friday'?'fri':''}">${d.day}<br><span style="font-weight:400">${d.weekday.slice(0,3)}</span></th>`);
+  head+="</tr></thead>";
+  let body="<tbody>";
+  DEPTS.forEach(([k,lab])=>{
+    body+=`<tr><td class="lab">${lab}</td>`;
+    for(let i=0;i<N;i++){body+=`<td>${deptCounts(i)[k]}</td>`;}
+    body+="</tr>";
+  });
+  body+="</tbody>";
+  t.innerHTML=head+body;
+}
+
+function dateRangeLabel(idxList){
+  if(!idxList.length) return "";
+  const ranges=[]; let start=idxList[0], prev=idxList[0];
+  for(let k=1;k<=idxList.length;k++){
+    const cur=idxList[k];
+    if(cur===prev+1){ prev=cur; continue; }
+    ranges.push([start,prev]); start=cur; prev=cur;
+  }
+  return ranges.map(([a,b])=> a===b ? fmtDate(DAYS[a].iso) : (fmtDate(DAYS[a].iso)+" – "+fmtDate(DAYS[b].iso))).join(", ");
+}
+function detectConflicts(){
+  const out=[];
+  const g={NARCOTIC:[],NIGHT_ZERO:[],NIGHT_MULTI:[],IV:[],CLINICAL:[],IN:[],OUT_FRI:[]};
+  for(let i=0;i<N;i++){
+    const c=deptCounts(i); const fri = DAYS[i].weekday==="Friday";
+    if(!fri){
+      if((c.NARCOTIC||0)<1) g.NARCOTIC.push(i);
+      if((c.IV||0)<1) g.IV.push(i);
+      if((c.CLINICAL||0)<1) g.CLINICAL.push(i);
+      if((c.IN||0)<1) g.IN.push(i);
+    } else if((c.OUT||0)>0) g.OUT_FRI.push(i);
+    if((c.NIGHT||0)===0) g.NIGHT_ZERO.push(i);
+    else if((c.NIGHT||0)>1) g.NIGHT_MULTI.push(i);
+  }
+  if(g.NARCOTIC.length) out.push({sev:"err",t:"Narcotic coverage gap",d:`No one assigned to Narcotic on ${g.NARCOTIC.length} day(s): ${dateRangeLabel(g.NARCOTIC)}.`});
+  if(g.NIGHT_ZERO.length) out.push({sev:"err",t:"No night coverage",d:`Night shift has 0 staff on ${g.NIGHT_ZERO.length} day(s): ${dateRangeLabel(g.NIGHT_ZERO)}.`});
+  if(g.IN.length) out.push({sev:"warn",t:"Inpatient coverage gap",d:`No one assigned to Inpatient on ${g.IN.length} day(s): ${dateRangeLabel(g.IN)}.`});
+  if(g.IV.length) out.push({sev:"warn",t:"IV coverage gap",d:`No one assigned to IV on ${g.IV.length} day(s): ${dateRangeLabel(g.IV)}.`});
+  if(g.CLINICAL.length) out.push({sev:"warn",t:"Clinical & Quality gap",d:`No one assigned to Clinical & Quality on ${g.CLINICAL.length} day(s): ${dateRangeLabel(g.CLINICAL)}.`});
+  if(g.OUT_FRI.length) out.push({sev:"warn",t:"Outpatient staffed on Friday",d:`Outpatient is normally closed Fridays — staff is assigned on ${g.OUT_FRI.length} Friday(s): ${dateRangeLabel(g.OUT_FRI)}.`});
+  if(g.NIGHT_MULTI.length) out.push({sev:"info",t:"Extra night staff",d:`More than 1 person on Night on ${g.NIGHT_MULTI.length} day(s): ${dateRangeLabel(g.NIGHT_MULTI)}.`});
+
+  NAMES.forEach(n=>{
+    let bestOff=[0,-1], curStart=null, bestWork=[0,-1], wStart=null;
+    for(let i=0;i<N;i++){
+      const isOff = EMP[n][i].code==="OFF";
+      if(isOff){ if(curStart===null)curStart=i; if(i-curStart > bestOff[1]-bestOff[0]) bestOff=[curStart,i]; }
+      else curStart=null;
+      if(!isOff){ if(wStart===null)wStart=i; if(i-wStart > bestWork[1]-bestWork[0]) bestWork=[wStart,i]; }
+      else wStart=null;
+    }
+    const offLen=bestOff[1]-bestOff[0]+1, workLen=bestWork[1]-bestWork[0]+1;
+    if(bestOff[1]>=0 && offLen>=7)
+      out.push({sev:"info",t:"Extended absence",d:`${n} is off for ${offLen} consecutive days (${fmtDate(DAYS[bestOff[0]].iso)} – ${fmtDate(DAYS[bestOff[1]].iso)}) — confirm this is planned leave.`});
+    if(bestWork[1]>=0 && workLen>=7)
+      out.push({sev:"warn",t:"Long work stretch",d:`${n} works ${workLen} days in a row without a day off (${fmtDate(DAYS[bestWork[0]].iso)} – ${fmtDate(DAYS[bestWork[1]].iso)}).`});
+  });
+  return out;
+}
+function renderConflicts(){
+  const list=detectConflicts();
+  const errs=list.filter(c=>c.sev==="err").length, warns=list.filter(c=>c.sev==="warn").length, infos=list.filter(c=>c.sev==="info").length;
+  const cc=document.getElementById("confCount");
+  cc.textContent = errs+warns+infos;
+  cc.className = "pill " + (errs?"err":warns?"warn":"ok");
+  const box=document.getElementById("conflist");
+  if(!list.length){ box.innerHTML = `<div class="allclear"><div class="big">✓</div><div class="t">No conflicts found</div></div>`; return; }
+  const order={err:0,warn:1,info:2};
+  list.sort((a,b)=>order[a.sev]-order[b.sev]);
+  box.innerHTML = list.map(c=>`<div class="citem ${c.sev}"><div class="ct">${c.sev==="err"?"⛔":c.sev==="warn"?"⚠️":"ℹ️"} ${c.t}</div><div class="cd">${c.d}</div></div>`).join("");
+}
+
+function render(){ renderGrid(); renderCoverage(); renderConflicts(); }
+function toast(msg){const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(window._tt);window._tt=setTimeout(()=>t.classList.remove("show"),2600);}
+
+function saveSched(){
+  setSync("busy","Publishing…");
+  const payload = {days:DAYS, assign:EMP, updatedAt: new Date().toISOString()};
+  DOC_REF.set(payload).then(()=>{ setSync("live","Synced"); toast("✓ Published — the whole team's My Shift page updates live"); })
+    .catch(err=>{ setSync("err","Save failed"); toast("Save failed — check your connection"); console.error(err); });
+}
+function exportJSON(){const blob=new Blob([JSON.stringify(EMP,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="pharmacy_schedule.json";a.click();toast("Exported JSON file");}
+function importJSON(ev){const f=ev.target.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);EMP=d;render();toast("Schedule imported (not yet published)");}catch(e){toast("Invalid file");}};
+  r.readAsText(f);ev.target.value="";}
+
+/* ===================== SMART EXCEL IMPORT ===================== */
+let _pendingImport = null;
+function splitNames(raw){
+  const parts=[]; let buf="", depth=0;
+  for(const ch of raw){
+    if(ch==='('){ depth++; buf+=ch; }
+    else if(ch===')'){ depth=Math.max(0,depth-1); buf+=ch; }
+    else if(ch==='-' && depth===0){ parts.push(buf); buf=""; }
+    else buf+=ch;
+  }
+  parts.push(buf);
+  return parts.map(p=>p.trim()).filter(Boolean);
+}
+function parseNameNote(tok){
+  const m = tok.trim().match(/^(.*?)\s*\((.*?)\)\s*$/);
+  if(m) return [m[1].trim(), m[2].trim()];
+  return [tok.trim(), null];
+}
+function startKey(time){
+  const m = (time||"").toLowerCase().match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
+  if(!m) return null;
+  return `${parseInt(m[1],10)}:${m[2]||"00"}${m[3]}`;
+}
+function classifyColumn(deptRaw, timeRaw){
+  const dept=(deptRaw||"").toLowerCase();
+  const time=(timeRaw||"").toLowerCase();
+  if(!time.trim()) return null;
+  if(!dept.trim() && time.includes("off")) return "OFF_COL";
+  const key = startKey(time);
+  if(dept.includes("out")){
+    if(time.includes("9am") && time.includes("1pm")) return "OUT_SPLIT";
+    if(key==="9:00am") return "OUT_95";
+    if(key==="7:00am") return "OUT_73";
+    if(key==="8:00am") return "OUT_84";
+    if(time.includes("1:30")) return "OUT_130930";
+    if(key==="2:00pm") return "OUT_DEL";
+    if(key==="1:00pm") return "OUT_19";
+    if(key==="3:00pm") return "OUT_311";
+  }
+  if(dept.includes("patient") && !dept.includes("out")){
+    if(key==="7:00am") return "IN_73";
+    if(key==="8:00am") return "IN_84";
+    if(key==="3:00pm") return "IN_311";
+  }
+  if(dept.includes("night")) return "NIGHT";
+  if(dept.includes("iv")){
+    if(key==="7:00am") return "IV_73";
+    if(key==="9:00am") return "IV_95";
+    if(key==="1:00pm") return "IV_19";
+  }
+  if(dept.includes("clin")) return "CLINICAL";
+  if(dept.includes("narc")) return "NARCOTIC";
+  return null;
+}
+
+function importExcelFile(ev){
+  const f = ev.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type:"array"});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:false, defval:""});
+      const merges = ws["!merges"] || [];
+      let deptRowIdx=-1;
+      for(let r=0;r<Math.min(rows.length,10);r++){
+        if((rows[r]||[]).some(c=>typeof c==="string" && /patient/i.test(c))){ deptRowIdx=r; break; }
+      }
+      if(deptRowIdx===-1) throw new Error("Could not find the department header row (looking for 'PATIENT').");
+      const timeRowIdx = deptRowIdx+1;
+      const contRowIdx = deptRowIdx+2;
+      const ncols = 21;
+      const deptRow = new Array(ncols).fill("");
+      (rows[deptRowIdx]||[]).forEach((v,c)=>{ deptRow[c]=v||""; });
+      merges.forEach(m=>{
+        if(m.s.r===deptRowIdx){
+          const val = (rows[deptRowIdx]||[])[m.s.c] || "";
+          for(let c=m.s.c;c<=m.e.c;c++) deptRow[c]=val;
+        }
+      });
+      const colMap = {};
+      for(let c=2;c<ncols;c++){
+        const dept = deptRow[c];
+        let time = (rows[timeRowIdx]||[])[c] || "";
+        const cont = (rows[contRowIdx]||[])[c] || "";
+        if(cont) time = time + " " + cont;
+        const code = classifyColumn(dept, time);
+        if(code) colMap[c]=code;
+      }
+      if(Object.keys(colMap).length < 8) throw new Error("Only recognized "+Object.keys(colMap).length+" columns — header layout looks different than expected.");
+      const dataStart = contRowIdx+1;
+      const dayRows=[];
+      for(let r=dataStart;r<rows.length;r++){
+        const row=rows[r]||[];
+        const dayNum = parseInt(row[0],10);
+        if(!dayNum || isNaN(dayNum)) break;
+        const todayMap={};
+        for(const c in colMap){
+          const code = colMap[c];
+          const raw = (row[c]||"").toString().trim();
+          if(!raw) continue;
+          const toks = splitNames(raw);
+          if(code==="OFF_COL"){
+            toks.forEach(tok=>{
+              const [nm,note]=parseNameNote(tok);
+              if(!(nm in todayMap)) todayMap[nm]=["OFF",null];
+            });
+          } else {
+            toks.forEach(tok=>{
+              const [nm,note]=parseNameNote(tok);
+              todayMap[nm]=[code,note];
+            });
+          }
+        }
+        dayRows.push({day:dayNum, todayMap});
+      }
+      if(!dayRows.length) throw new Error("No data rows found below the header (expected day numbers in column A).");
+      const seenNames = new Set();
+      dayRows.forEach(dr=>Object.keys(dr.todayMap).forEach(n=>seenNames.add(n)));
+      _pendingImport = {dayRows, names:Array.from(seenNames)};
+      openImportModal(f.name, dayRows.length, Array.from(seenNames));
+    }catch(err){
+      toast("Import failed: "+err.message);
+    }
+  };
+  reader.readAsArrayBuffer(f);
+  ev.target.value="";
+}
+
+function openImportModal(filename, nDays, names){
+  const now=new Date();
+  let guessMonth = now.getMonth()+1, guessYear = now.getFullYear();
+  if(N>0){
+    const last=new Date(DAYS[N-1].iso+"T00:00:00");
+    guessMonth = last.getMonth()+2; guessYear = last.getFullYear();
+    if(guessMonth>12){ guessMonth=1; guessYear++; }
+  }
+  document.getElementById("modalMonth").value=String(guessMonth);
+  const ySel=document.getElementById("modalYear"); ySel.innerHTML="";
+  for(let y=guessYear-1;y<=guessYear+2;y++){const o=document.createElement("option");o.value=y;o.textContent=y;if(y===guessYear)o.selected=true;ySel.appendChild(o);}
+  document.getElementById("modalPreview").innerHTML =
+    `<b>${filename}</b><br>Detected ${nDays} day-rows · ${names.length} names<br>${names.slice(0,12).join(", ")}${names.length>12?"…":""}`;
+  document.getElementById("modalOverlay").classList.remove("hidden");
+}
+function closeModal(){ document.getElementById("modalOverlay").classList.add("hidden"); _pendingImport=null; }
+
+function confirmImport(){
+  if(!_pendingImport) return closeModal();
+  const month = parseInt(document.getElementById("modalMonth").value,10);
+  const year = parseInt(document.getElementById("modalYear").value,10);
+  const importedDays = _pendingImport.dayRows.map(dr=>{
+    const dt = new Date(year, month-1, dr.day);
+    const iso = `${year}-${String(month).padStart(2,"0")}-${String(dr.day).padStart(2,"0")}`;
+    return {day:dr.day, weekday:dt.toLocaleDateString("en-US",{weekday:"long"}), iso};
+  });
+  const importedAssign = {};
+  _pendingImport.names.forEach(n=>{
+    importedAssign[n] = _pendingImport.dayRows.map(dr=>{
+      const v = dr.todayMap[n];
+      return v ? {code:v[0], note:v[1]} : {code:"OFF", note:null};
+    });
+  });
+  upsertDays(importedDays, importedAssign);
+  closeModal();
+  render();
+  toast(`Imported ${importedDays.length} days for ${String(month).padStart(2,"0")}/${year} — click Save & publish to make it live`);
+}
+
+function upsertDays(importedDays, importedAssign){
+  const oldDayMap = new Map(DAYS.map((d,i)=>[d.iso,i]));
+  const impDayMap = new Map(importedDays.map((d,i)=>[d.iso,i]));
+  const allIso = Array.from(new Set([...DAYS.map(d=>d.iso), ...importedDays.map(d=>d.iso)])).sort();
+  const newDays = allIso.map(iso => impDayMap.has(iso) ? importedDays[impDayMap.get(iso)] : DAYS[oldDayMap.get(iso)]);
+  const allNames = Array.from(new Set([...NAMES, ...Object.keys(importedAssign)]));
+  const newEmp = {};
+  allNames.forEach(name=>{
+    newEmp[name] = allIso.map(iso=>{
+      if(impDayMap.has(iso) && importedAssign[name]) return importedAssign[name][impDayMap.get(iso)];
+      if(oldDayMap.has(iso) && EMP[name]) return EMP[name][oldDayMap.get(iso)];
+      return {code:"OFF", note:null};
+    });
+  });
+  DAYS.length=0; DAYS.push(...newDays);
+  EMP = newEmp;
+  allNames.forEach(n=>{ if(!NAMES.includes(n)) NAMES.push(n); });
+  N = DAYS.length;
+  document.getElementById("rangeTag").textContent = fmtDate(DAYS[0].iso)+" – "+fmtDate(DAYS[N-1].iso);
+}
+
+/* ===================== EXCEL EXPORT ===================== */
+function exportToExcel(){
+  const cols = [
+    {h1:"outPATIENT",h2:"7am-3:00pm",code:"OUT_73"},
+    {h1:"outPATIENT",h2:"8:00am-4:00PM",code:"OUT_84"},
+    {h1:"outPATIENT",h2:"9am-1pm - 5:30pm-9:30pm",code:"OUT_SPLIT"},
+    {h1:"outPATIENT",h2:"9am-5pm",code:"OUT_95"},
+    {h1:"outPATIENT",h2:"1:00pm -9:00pm",code:"OUT_19"},
+    {h1:"outPATIENT",h2:"1:30pm -9:30pm",code:"OUT_130930"},
+    {h1:"outPATIENT",h2:"2:00pm -10:00pm",code:"OUT_DEL"},
+    {h1:"outPATIENT",h2:"3pm-11:00pm",code:"OUT_311"},
+    {h1:"",h2:"",code:null},
+    {h1:"IN-PATIENT",h2:"7am-3:00pm",code:"IN_73"},
+    {h1:"IN-PATIENT",h2:"8am-4:00pm",code:"IN_84"},
+    {h1:"IN-PATIENT",h2:"3pm-11:00pm",code:"IN_311"},
+    {h1:"NIGHT",h2:"11pm-7:00am",code:"NIGHT"},
+    {h1:"",h2:"off",code:"OFF_COL"},
+    {h1:"IV",h2:"7am-3:00pm",code:"IV_73"},
+    {h1:"IV",h2:"9am-5pm",code:"IV_95"},
+    {h1:"IV",h2:"1:00pm -9:00pm",code:"IV_19"},
+    {h1:"",h2:"",code:null},
+    {h1:"CLINICAL & QUALITY",h2:"8am-4:00pm",code:"CLINICAL"},
+    {h1:"NARCOTIC",h2:"8am-4:00pm",code:"NARCOTIC"}
+  ];
+  const aoa = [];
+  aoa.push(["Pharmacy Schedule — Saudi German Hospital, Hail"]);
+  aoa.push(["Day","Weekday",...cols.map(c=>c.h1)]);
+  aoa.push(["","",...cols.map(c=>c.h2)]);
+  DAYS.forEach((d,i)=>{
+    const row=[d.day, d.weekday];
+    cols.forEach(c=>{
+      if(!c.code){ row.push(""); return; }
+      if(c.code==="OFF_COL"){
+        const offNames = NAMES.filter(n=>EMP[n][i].code==="OFF");
+        row.push(offNames.join(" - "));
+        return;
+      }
+      const names = NAMES.filter(n=>EMP[n][i].code===c.code).map(n=>{
+        const note = EMP[n][i].note; return note? `${n} (${note})` : n;
+      });
+      row.push(names.join(" - "));
+    });
+    aoa.push(row);
+  });
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const merges=[{s:{r:0,c:0},e:{r:0,c:1+cols.length}}];
+  let c0=2;
+  for(let i=0;i<cols.length;){
+    if(!cols[i].h1){ i++; c0++; continue; }
+    let j=i; while(j<cols.length && cols[j].h1===cols[i].h1) j++;
+    if(j-i>1) merges.push({s:{r:1,c:c0},e:{r:1,c:c0+(j-i-1)}});
+    c0 += (j-i); i=j;
+  }
+  ws["!merges"]=merges;
+  ws["!cols"]=[{wch:5},{wch:11},...cols.map(()=>({wch:16}))];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Schedule");
+  const fname = `pharmacy_schedule_${DAYS[0].iso}_to_${DAYS[N-1].iso}.xlsx`;
+  XLSX.writeFile(wb, fname);
+  toast("✓ Exported "+fname);
+}
+</script>
+</body>
+</html>
