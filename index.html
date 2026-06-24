@@ -233,6 +233,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
     <button class="btn" onclick="document.getElementById('importer').click()">⤒ Restore (JSON)</button>
     <input type="file" id="importer" accept="application/json" class="hidden" onchange="importJSON(event)">
     <button class="btn" onclick="reloadFromServer()">↺ Reload from server</button>
+    <button class="btn" style="border-color:#D9622E;color:#D9622E" onclick="restoreBaseline()">⚠️ Restore known-good baseline</button>
     <button class="btn" onclick="window.print()">🖨 Print</button>
   </div>
 
@@ -368,6 +369,11 @@ function reloadFromServer(){
     if(snap.exists){ loadInto(snap.data()); setSync("live","Synced"); toast("Reloaded from server"); }
     else { loadInto(SEED_DATA); setSync("warn","No published data yet — showing seed"); }
   }).catch(err=>{ setSync("err","Offline"); toast("Couldn't reach the server"); console.error(err); });
+}
+function restoreBaseline(){
+  if(!confirm("This discards any edits made in the browser AND overwrites the published Firebase schedule with the original known-good baseline (17 Jun – 31 Jul, before today's date bug). Continue?")) return;
+  loadInto(JSON.parse(JSON.stringify(SEED_DATA)));
+  toast("Baseline loaded locally — click Save & publish to push it live");
 }
 
 /* initial load */
@@ -668,7 +674,8 @@ function confirmImport(){
   const year = parseInt(document.getElementById("modalYear").value,10);
   const importedDays = _pendingImport.dayRows.map(dr=>{
     const dt = new Date(year, month-1, dr.day);
-    return {day:dr.day, weekday:dt.toLocaleDateString("en-US",{weekday:"long"}), iso: dt.toISOString().slice(0,10)};
+    const iso = `${year}-${String(month).padStart(2,"0")}-${String(dr.day).padStart(2,"0")}`;
+    return {day:dr.day, weekday:dt.toLocaleDateString("en-US",{weekday:"long"}), iso};
   });
   const importedAssign = {};
   _pendingImport.names.forEach(n=>{
